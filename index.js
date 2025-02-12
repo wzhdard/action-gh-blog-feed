@@ -7,6 +7,7 @@ async function run() {
     const token = core.getInput('token');
     const dryRun = core.getBooleanInput('dry-run');
     const labels = core.getMultilineInput('labels');
+    const days = core.getInput('days');
 
     const baseUrl = 'https://github.blog/feed/?s=';
     const octokit = github.getOctokit(token);
@@ -23,19 +24,31 @@ async function run() {
       await _formatAndPrintLogOutput(feed);
     }
 
-    // TODO: Create an issue in the workflow repo listing all rss feed items with their hyperlink, publication date, and title. Label the issue as "news-update".
+    // Filter feed items based on the number of days input
+    const filteredFeeds = allFeeds.filter(item => {
+      const itemDate = new Date(item.pubDate);
+      const currentDate = new Date();
+      const timeDiff = Math.abs(currentDate - itemDate);
+      const diffDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      return diffDays <= days;
+    });
+
+    // Sort feed items by publication date in descending order
+    filteredFeeds.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+    // Create an issue in the workflow repo listing all rss feed items with their hyperlink, publication date, and title. Label the issue as "news-update".
     if (!dryRun) {
-      const issueBody = allFeeds.map(item => `- [${item.title}](${item.link})`).join('\n');
+      const issueBody = filteredFeeds.map(item => `- [${item.title}](${item.link}) - ${item.pubDate}`).join('\n');
       const issue = await octokit.rest.issues.create({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
-      title: 'News Update',
+      title: `News Update (${filteredFeeds[filteredFeeds.length - 1].pubDate} - ${filteredFeeds[0].pubDate})`,
       body: issueBody,
       labels: ['news-update']
       });
     }
 
-    core.setOutput('feeds', JSON.stringify(allFeeds));
+    core.setOutput('feeds', JSON.stringify(filteredFeeds));
 
   } catch (error) {
     core.setFailed(error.message);
