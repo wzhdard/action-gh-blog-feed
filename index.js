@@ -39,10 +39,12 @@ async function run() {
     // Create an issue in the workflow repo listing all rss feed items with their hyperlink, publication date, and title. Label the issue as "news-update".
     if (!dryRun) {
       const issueBody = filteredFeeds.map(item => `- [${item.title}](${item.link}) - ${item.pubDate}`).join('\n');
+      const startDate = new Date(filteredFeeds[filteredFeeds.length - 1].pubDate).toISOString().split('T')[0];
+      const endDate = new Date(filteredFeeds[0].pubDate).toISOString().split('T')[0];
       const issue = await octokit.rest.issues.create({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
-      title: `News Update (${filteredFeeds[filteredFeeds.length - 1].pubDate} - ${filteredFeeds[0].pubDate})`,
+      title: `News Update (${startDate} - ${endDate})`,
       body: issueBody,
       labels: ['news-update']
       });
